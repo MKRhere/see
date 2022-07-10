@@ -1,11 +1,7 @@
 const std = @import("std");
+
 const fs = std.fs;
-const path = std.fs.path;
-const fmt = std.fmt;
-
 const File = std.fs.File;
-const Dir = std.fs.Dir;
-
 const allocator = std.heap.page_allocator;
 
 fn writeAll(reader: File.Reader, writer: File.Writer) !void {
@@ -13,7 +9,7 @@ fn writeAll(reader: File.Reader, writer: File.Writer) !void {
 
     var bytes_read: usize = try reader.readAll(&buffer);
     while (bytes_read != 0) : (bytes_read = try reader.readAll(&buffer)) {
-        try fmt.format(writer, "{s}", .{buffer[0..bytes_read]});
+        try writer.writeAll(buffer[0..bytes_read]);
     }
 }
 

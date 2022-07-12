@@ -2,18 +2,27 @@ const std = @import("std");
 
 const fs = std.fs;
 const File = std.fs.File;
-const allocator = std.heap.page_allocator;
 
-fn writeAll(reader: File.Reader, writer: File.Writer) !void {
-    var buffer: [100]u8 = undefined;
-
-    var bytes_read: usize = try reader.readAll(&buffer);
-    while (bytes_read != 0) : (bytes_read = try reader.readAll(&buffer)) {
-        try writer.writeAll(buffer[0..bytes_read]);
+fn copy(reader: File.Reader, writer: File.Writer) !void {
+    var buf: [1024 * 1024 * 4]u8 = undefined;
+    while (true) {
+        const bytesRead = try reader.read(&buf);
+        if (bytesRead == 0) return;
+        try writer.writeAll(buf[0..bytesRead]);
     }
 }
 
+fn ls(cwd: std.fs.Dir, input: []const u8, writer: File.Writer) !void {
+    var it = (try cwd.openDir(input, .{ .iterate = true })).iterate();
+    while (try it.next()) |entry|
+        try writer.print("{s}\n", .{entry.name});
+}
+
 pub fn main() anyerror!void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer std.debug.assert(!gpa.deinit());
+    var allocator = gpa.allocator();
+
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
@@ -22,22 +31,16 @@ pub fn main() anyerror!void {
     const stdout = std.io.getStdOut().writer();
 
     const cwd = fs.cwd();
-    const file = try cwd.openFile(input, .{});
-    defer file.close();
-    const stat = try file.stat();
 
-    switch (stat.kind) {
-        File.Kind.File => {
-            try writeAll(file.reader(), stdout);
-        },
-        File.Kind.Directory => {
-            const dir = try cwd.openDir(input, .{ .iterate = true });
-            var iter = dir.iterate();
-
-            while (try iter.next()) |entry| {
-                try stdout.print("{s}\n", .{entry.name});
-            }
-        },
-        else => {},
+    if (cwd.openFile(input, .{})) |file| {
+        defer file.close();
+        switch ((try file.stat()).kind) {
+            .File => try copy(file.reader(), stdout),
+            .Directory => try ls(cwd, input, stdout),
+            else => {},
+        }
+    } else |err| {
+        if (err != error.IsDir) return err;
+        try ls(cwd, input, stdout);
     }
 }

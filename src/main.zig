@@ -13,7 +13,7 @@ fn copy(reader: File.Reader, writer: File.Writer) !void {
 }
 
 fn ls(cwd: std.fs.Dir, input: []const u8, writer: File.Writer) !void {
-    var it = (try cwd.openDir(input, .{ .iterate = true })).iterate();
+    var it = (try cwd.openIterableDir(input, .{})).iterate();
     while (try it.next()) |entry|
         try writer.print("{s}\n", .{entry.name});
 }

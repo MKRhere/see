@@ -4,8 +4,10 @@ fn ls(cwd: std.fs.Dir, input: []const u8, writer: std.fs.File.Writer) !void {
     var it = (try cwd.openDir(input, .{ .iterate = true })).iterate();
     var buf = std.io.bufferedWriter(writer);
     const bufWriter = buf.writer();
-    while (try it.next()) |entry|
-        try bufWriter.print("{s}\n", .{entry.name});
+    while (try it.next()) |entry| {
+        _ = try bufWriter.write(entry.name);
+        _ = try bufWriter.write("\n");
+    }
     try buf.flush();
 }
 

@@ -1,24 +1,11 @@
 const std = @import("std");
 
-const fs = std.fs;
-const File = fs.File;
-
-fn copy(reader: File.Reader, writer: File.Writer) !void {
-    var buf: [1024 * 1024 * 4]u8 = undefined;
-    while (true) {
-        const bytesRead = try reader.read(&buf);
-        if (bytesRead == 0) return;
-        try writer.writeAll(buf[0..bytesRead]);
-    }
-}
-
-fn ls(cwd: fs.Dir, input: []const u8, writer: File.Writer) !void {
+fn ls(cwd: std.fs.Dir, input: []const u8, writer: std.fs.File.Writer) !void {
     var it = (try cwd.openDir(input, .{ .iterate = true })).iterate();
-    var buf = std.io.bufferedWriter(writer);
-    const bufWriter = buf.writer();
-    while (try it.next()) |entry|
-        try bufWriter.print("{s}\n", .{entry.name});
-    try buf.flush();
+    while (try it.next()) |entry| {
+        try writer.writeAll(entry.name);
+        try writer.writeAll("\n");
+    }
 }
 
 pub fn main() !void {
@@ -31,19 +18,19 @@ pub fn main() !void {
 
     const input = if (args.len > 1) args[1] else ".";
 
-    const stdout = std.io.getStdOut().writer();
+    const stdout = std.io.getStdOut();
 
-    const cwd = fs.cwd();
+    const cwd = std.fs.cwd();
 
     if (cwd.openFile(input, .{})) |file| {
         defer file.close();
         switch ((try file.stat()).kind) {
-            .file => try copy(file.reader(), stdout),
-            .directory => try ls(cwd, input, stdout),
+            .file => try stdout.writeFileAll(file, .{}),
+            .directory => try ls(cwd, input, stdout.writer()),
             else => {},
         }
     } else |err| {
         if (err != error.IsDir) return err;
-        try ls(cwd, input, stdout);
+        try ls(cwd, input, stdout.writer());
     }
 }

@@ -2,10 +2,11 @@ const std = @import("std");
 
 fn ls(cwd: std.fs.Dir, input: []const u8, writer: std.fs.File.Writer) !void {
     var it = (try cwd.openDir(input, .{ .iterate = true })).iterate();
-    while (try it.next()) |entry| {
-        try writer.writeAll(entry.name);
-        try writer.writeAll("\n");
-    }
+    var buf = std.io.bufferedWriter(writer);
+    const bufWriter = buf.writer();
+    while (try it.next()) |entry|
+        try bufWriter.print("{s}\n", .{entry.name});
+    try buf.flush();
 }
 
 pub fn main() !void {
@@ -19,7 +20,6 @@ pub fn main() !void {
     const input = if (args.len > 1) args[1] else ".";
 
     const stdout = std.io.getStdOut();
-
     const cwd = std.fs.cwd();
 
     if (cwd.openFile(input, .{})) |file| {
